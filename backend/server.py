@@ -631,65 +631,9 @@ async def image_enhance(data: ImageEnhanceRequest, user: dict = Depends(get_curr
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image enhance error: {str(e)}")
 
-# Jazz TV / Tamasha Channel Data - Verified Working Streams
+# Jazz TV / Tamasha Channel Data - Verified Working Streams (HTTPS with CORS)
 JAZZTV_CHANNELS = [
-    # News Channels (Verified Working)
-    {
-        "id": "92_news",
-        "name": "92 News HD",
-        "logo": "https://i.imgur.com/gp1Ao4s.jpeg",
-        "stream_url": "http://92news.vdn.dstreamone.net/92newshd/92hd/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "abn_news",
-        "name": "ABN News",
-        "logo": "https://www.lyngsat.com/logo/tv/aa/abn-news-pk.png",
-        "stream_url": "http://116.90.120.149:8000/play/a01r/index.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "city_news",
-        "name": "City News HD",
-        "logo": "https://i.imgur.com/GtYG9lG.png",
-        "stream_url": "http://cdn.citymediagroupreg.com:1935/citynewshd/myStream/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "pnn_news",
-        "name": "PNN News",
-        "logo": "https://i.imgur.com/edKutxd.png",
-        "stream_url": "https://cdn.bmstudiopk.com/pnn/smil:PNN.smil/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    # Sports (Verified Working)
-    {
-        "id": "ptv_sports",
-        "name": "PTV Sports",
-        "logo": "https://i.imgur.com/CPm6GHA.png",
-        "stream_url": "https://tvsen5.aynaott.com/Ptvsports/index.m3u8",
-        "category": "Sports",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "geo_super",
-        "name": "Geo Super",
-        "logo": "https://upload.wikimedia.org/wikipedia/en/5/5f/Geo_Super_logo.png",
-        "stream_url": "http://116.90.120.149:8000/play/a021/index.m3u8",
-        "category": "Sports",
-        "provider": "Tamasha",
-        "active": True
-    },
-    # Religious (Verified Working)
+    # Religious (HTTPS + CORS - Most Reliable)
     {
         "id": "madani_urdu",
         "name": "Madani Channel Urdu",
@@ -753,7 +697,7 @@ JAZZTV_CHANNELS = [
         "provider": "Tamasha",
         "active": True
     },
-    # Music (Verified Working)
+    # Music (HTTPS + CORS)
     {
         "id": "joo_music",
         "name": "JooMusic",
@@ -763,7 +707,7 @@ JAZZTV_CHANNELS = [
         "provider": "Tamasha",
         "active": True
     },
-    # Travel (Verified Working)
+    # Travel (HTTPS + CORS)
     {
         "id": "discover_pakistan",
         "name": "Discover Pakistan",
@@ -773,12 +717,50 @@ JAZZTV_CHANNELS = [
         "provider": "Tamasha",
         "active": True
     },
+    # News (HTTP but with CORS - may work)
+    {
+        "id": "92_news",
+        "name": "92 News HD",
+        "logo": "https://i.imgur.com/gp1Ao4s.jpeg",
+        "stream_url": "https://92news.vdn.dstreamone.net/92newshd/92hd/playlist.m3u8",
+        "category": "News",
+        "provider": "Tamasha",
+        "active": True
+    },
+    {
+        "id": "city_news",
+        "name": "City News HD",
+        "logo": "https://i.imgur.com/GtYG9lG.png",
+        "stream_url": "https://cdn.citymediagroupreg.com:1935/citynewshd/myStream/playlist.m3u8",
+        "category": "News",
+        "provider": "Tamasha",
+        "active": True
+    },
+    {
+        "id": "pnn_news",
+        "name": "PNN News",
+        "logo": "https://i.imgur.com/edKutxd.png",
+        "stream_url": "https://cdn.bmstudiopk.com/pnn/smil:PNN.smil/playlist.m3u8",
+        "category": "News",
+        "provider": "Tamasha",
+        "active": True
+    },
+    # Sports
+    {
+        "id": "ptv_sports",
+        "name": "PTV Sports",
+        "logo": "https://i.imgur.com/CPm6GHA.png",
+        "stream_url": "https://tvsen5.aynaott.com/Ptvsports/index.m3u8",
+        "category": "Sports",
+        "provider": "Tamasha",
+        "active": True
+    },
     # Entertainment 
     {
         "id": "see_tv",
         "name": "See TV",
         "logo": "https://i.postimg.cc/T3NR0zPN/seetv.png",
-        "stream_url": "http://116.90.120.149:8000/play/a01l/index.m3u8",
+        "stream_url": "https://116.90.120.149:8000/play/a01l/index.m3u8",
         "category": "Entertainment",
         "provider": "Tamasha",
         "active": True
@@ -788,9 +770,19 @@ JAZZTV_CHANNELS = [
         "id": "minimax",
         "name": "Minimax",
         "logo": "https://i.imgur.com/TJvf8vd.png",
-        "stream_url": "http://116.90.120.149:8000/play/a01c/index.m3u8",
+        "stream_url": "https://116.90.120.149:8000/play/a01c/index.m3u8",
         "category": "Kids",
         "provider": "Tamasha",
+        "active": True
+    },
+    # Free test stream (always works - for testing)
+    {
+        "id": "test_stream",
+        "name": "Test Channel (Big Buck Bunny)",
+        "logo": "https://i.imgur.com/qPD9J4I.png",
+        "stream_url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "category": "Test",
+        "provider": "Test",
         "active": True
     },
 ]
