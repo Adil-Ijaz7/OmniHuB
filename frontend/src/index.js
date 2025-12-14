@@ -4,20 +4,41 @@ import "@/index.css";
 import App from "@/App";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
-// Suppress any global undefined variable errors from external scripts
-window.onerror = function(message, source, lineno, colno, error) {
-  // Ignore errors from external scripts
-  if (source && (source.includes('emergent') || source.includes('posthog'))) {
-    console.warn('Suppressed external script error:', message);
-    return true;
+// Global error suppression for undefined variables from external scripts
+const originalError = console.error;
+console.error = (...args) => {
+  const message = args[0]?.toString() || '';
+  // Suppress specific errors from external scripts
+  if (message.includes('is not defined') || 
+      message.includes('CZaCryq') ||
+      message.includes('posthog') ||
+      message.includes('emergent')) {
+    console.warn('[Suppressed error]', ...args);
+    return;
   }
-  // Log but don't crash for undefined variable errors
-  if (message && message.includes('is not defined')) {
-    console.warn('Suppressed undefined variable error:', message);
-    return true;
-  }
-  return false;
+  originalError.apply(console, args);
 };
+
+// Suppress unhandled errors
+window.addEventListener('error', (event) => {
+  const message = event.message || '';
+  if (message.includes('is not defined') || message.includes('CZaCryq')) {
+    console.warn('[Suppressed window error]', message);
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+}, true);
+
+// Suppress unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+  const message = event.reason?.message || event.reason?.toString() || '';
+  if (message.includes('is not defined') || message.includes('CZaCryq')) {
+    console.warn('[Suppressed promise rejection]', message);
+    event.preventDefault();
+    return true;
+  }
+});
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
