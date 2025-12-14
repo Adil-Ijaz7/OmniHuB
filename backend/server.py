@@ -356,32 +356,52 @@ async def phone_lookup(data: PhoneLookupRequest, user: dict = Depends(get_curren
 async def eyecon_lookup(data: EyeconLookupRequest, user: dict = Depends(get_current_user)):
     cost = await check_credits(user, "eyecon_lookup")
     
-    # Get Eyecon credentials from env (use empty string as fallback - API will handle auth errors)
+    # Sanitize phone number - remove all non-numeric characters
+    import re
+    sanitized_phone = re.sub(r'\D', '', data.phone)
+    
+    # Ensure proper format (add 92 prefix if starts with 0)
+    if sanitized_phone.startswith('0'):
+        sanitized_phone = '92' + sanitized_phone[1:]
+    
+    logger.info(f"Eyecon lookup initiated for: {sanitized_phone}")
+    
+    # Get Eyecon credentials from env
     e_auth_v = os.environ.get("EYECON_E_AUTH_V", "")
     e_auth = os.environ.get("EYECON_E_AUTH", "")
     e_auth_c = os.environ.get("EYECON_E_AUTH_C", "")
     e_auth_k = os.environ.get("EYECON_E_AUTH_K", "")
     
-    # Log warning if config incomplete (but don't block)
-    config_incomplete = not all([e_auth_v, e_auth, e_auth_c, e_auth_k]) or "REPLACE_ME" in [e_auth_v, e_auth, e_auth_c, e_auth_k]
-    if config_incomplete:
-        logger.warning("Eyecon API credentials not fully configured - running in safe mode")
+    # Check if headers are configured
+    headers_configured = all([
+        e_auth_v and e_auth_v != "REPLACE_ME",
+        e_auth and e_auth != "REPLACE_ME",
+        e_auth_c and e_auth_c != "REPLACE_ME",
+        e_auth_k and e_auth_k != "REPLACE_ME"
+    ])
     
+    logger.info(f"Eyecon headers configured: {headers_configured}")
+    
+    # Build headers
     headers = {
         "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
         "accept": "application/json",
-        "e-auth-v": e_auth_v if e_auth_v and e_auth_v != "REPLACE_ME" else "",
-        "e-auth": e_auth if e_auth and e_auth != "REPLACE_ME" else "",
-        "e-auth-c": e_auth_c if e_auth_c and e_auth_c != "REPLACE_ME" else "",
-        "e-auth-k": e_auth_k if e_auth_k and e_auth_k != "REPLACE_ME" else "",
         "accept-charset": "UTF-8",
         "content-type": "application/x-www-form-urlencoded",
         "Host": "api.eyecon-app.com",
         "Connection": "Keep-Alive"
     }
     
+    # Add auth headers only if configured
+    if headers_configured:
+        headers["e-auth-v"] = e_auth_v
+        headers["e-auth"] = e_auth
+        headers["e-auth-c"] = e_auth_c
+        headers["e-auth-k"] = e_auth_k
+    
+    # Build query params
     params = {
-        "cli": data.phone,
+        "cli": sanitized_phone,
         "lang": "en",
         "is_callerid": "true",
         "is_ic": "true",
@@ -392,23 +412,109 @@ async def eyecon_lookup(data: EyeconLookupRequest, user: dict = Depends(get_curr
     
     try:
         async with httpx.AsyncClient() as client_http:
+            logger.info(f"Eyecon request sending to API...")
             response = await client_http.get(
                 "https://api.eyecon-app.com/app/getnames.jsp",
                 headers=headers,
                 params=params,
                 timeout=30.0
             )
-            # Try to parse JSON, handle non-JSON responses gracefully
+            
+            status_code = response.status_code
+            logger.info(f"Eyecon response received → status {status_code}")
+            
+            # Parse response
+            response_text = response.text
+            logger.info(f"Eyecon response body length: {len(response_text)} chars")
+            
+            # Try to parse as JSON
             try:
-                result = response.json()
-            except:
-                result = {"raw_response": response.text[:500], "status_code": response.status_code}
+                result_data = response.json()
+                logger.info(f"Eyecon response parsed as JSON successfully")
+            except Exception as json_err:
+                logger.warning(f"Eyecon response not JSON: {str(json_err)}")
+                result_data = None
+            
+            # Handle different status codes
+            if status_code == 200 and result_data:
+                # Success - extract names
+                names = []
+                if isinstance(result_data, list):
+                    names = result_data
+                elif isinstance(result_data, dict):
+                    names = result_data.get("names", result_data.get("results", []))
+                    if not names and "name" in result_data:
+                        names = [{"name": result_data["name"]}]
+                
+                await deduct_credits(user["id"], "eyecon_lookup", cost, "success", sanitized_phone)
+                return {
+                    "success": True,
+                    "mode": "live",
+                    "query": sanitized_phone,
+                    "status_code": status_code,
+                    "names": names if isinstance(names, list) else [names],
+                    "raw_data": result_data,
+                    "credits_used": cost,
+                    "headers_configured": headers_configured
+                }
+            
+            elif status_code in [401, 403]:
+                # Auth failed - return safe mode
+                logger.warning(f"Eyecon auth failed with status {status_code}")
+                await deduct_credits(user["id"], "eyecon_lookup", cost, "auth_failed", sanitized_phone)
+                return {
+                    "success": True,
+                    "mode": "safe",
+                    "query": sanitized_phone,
+                    "status_code": status_code,
+                    "names": [],
+                    "message": "Eyecon authentication failed - headers may be invalid or expired",
+                    "credits_used": cost,
+                    "headers_configured": headers_configured
+                }
+            
+            else:
+                # Other status - return what we got
+                logger.warning(f"Eyecon returned status {status_code}")
+                await deduct_credits(user["id"], "eyecon_lookup", cost, f"status_{status_code}", sanitized_phone)
+                return {
+                    "success": True,
+                    "mode": "safe",
+                    "query": sanitized_phone,
+                    "status_code": status_code,
+                    "names": [],
+                    "raw_response": response_text[:500] if response_text else "",
+                    "message": f"Eyecon returned status {status_code}",
+                    "credits_used": cost,
+                    "headers_configured": headers_configured
+                }
+                
+    except httpx.TimeoutException:
+        logger.error(f"Eyecon request timed out for {sanitized_phone}")
+        await deduct_credits(user["id"], "eyecon_lookup", cost, "timeout", sanitized_phone)
+        return {
+            "success": True,
+            "mode": "safe",
+            "query": sanitized_phone,
+            "names": [],
+            "message": "Eyecon request timed out",
+            "credits_used": cost,
+            "headers_configured": headers_configured
+        }
         
-        await deduct_credits(user["id"], "eyecon_lookup", cost, "success", data.phone)
-        return {"success": True, "data": result, "credits_used": cost, "safe_mode": config_incomplete}
     except Exception as e:
-        await deduct_credits(user["id"], "eyecon_lookup", cost, "failed", str(e))
-        return {"success": False, "data": None, "error": str(e), "credits_used": cost, "safe_mode": config_incomplete}
+        logger.error(f"Eyecon request failed: {str(e)}")
+        await deduct_credits(user["id"], "eyecon_lookup", cost, "error", str(e))
+        return {
+            "success": True,
+            "mode": "safe",
+            "query": sanitized_phone,
+            "names": [],
+            "message": f"Eyecon unavailable: {str(e)}",
+            "error": str(e),
+            "credits_used": cost,
+            "headers_configured": headers_configured
+        }
 
 @api_router.post("/tools/temp-email")
 async def temp_email(data: TempEmailRequest, user: dict = Depends(get_current_user)):
