@@ -631,39 +631,210 @@ async def image_enhance(data: ImageEnhanceRequest, user: dict = Depends(get_curr
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image enhance error: {str(e)}")
 
+# Jazz TV / Tamasha Channel Data
+JAZZTV_CHANNELS = [
+    # News Channels
+    {
+        "id": "geo_news",
+        "name": "Geo News",
+        "logo": "https://jazztv.com.pk/images/channels/geo-news.webp",
+        "stream_url": "https://jfrsgeo.cdn.jfrstvdemo.com/geonews/jfrstv_geo_news_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "ary_news",
+        "name": "ARY News",
+        "logo": "https://jazztv.com.pk/images/channels/ary-news.webp",
+        "stream_url": "https://jfrsary.cdn.jfrstvdemo.com/arynews/jfrstv_ary_news_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "express_news",
+        "name": "Express News",
+        "logo": "https://jazztv.com.pk/images/channels/express-news.webp",
+        "stream_url": "https://jfrsexp.cdn.jfrstvdemo.com/expressnews/jfrstv_express_news_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "samaa_tv",
+        "name": "Samaa TV",
+        "logo": "https://jazztv.com.pk/images/channels/samaa.webp",
+        "stream_url": "https://jfrssamaa.cdn.jfrstvdemo.com/samaa/jfrstv_samaa_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "dunya_news",
+        "name": "Dunya News",
+        "logo": "https://jazztv.com.pk/images/channels/dunya-news.webp",
+        "stream_url": "https://jfrsdunya.cdn.jfrstvdemo.com/dunyanews/jfrstv_dunya_news_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "92_news",
+        "name": "92 News",
+        "logo": "https://jazztv.com.pk/images/channels/92-news.webp",
+        "stream_url": "https://jfrs92.cdn.jfrstvdemo.com/92news/jfrstv_92_news_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "bol_news",
+        "name": "BOL News",
+        "logo": "https://jazztv.com.pk/images/channels/bol-news.webp",
+        "stream_url": "https://jfrsbol.cdn.jfrstvdemo.com/bolnews/jfrstv_bol_news_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "hum_news",
+        "name": "HUM News",
+        "logo": "https://jazztv.com.pk/images/channels/hum-news.webp",
+        "stream_url": "https://jfrshum.cdn.jfrstvdemo.com/humnews/jfrstv_hum_news_720p/playlist.m3u8",
+        "category": "News",
+        "provider": "JazzTV",
+        "active": True
+    },
+    # Entertainment Channels
+    {
+        "id": "hum_tv",
+        "name": "HUM TV",
+        "logo": "https://jazztv.com.pk/images/channels/hum-tv.webp",
+        "stream_url": "https://jfrshum.cdn.jfrstvdemo.com/humtv/jfrstv_hum_tv_720p/playlist.m3u8",
+        "category": "Entertainment",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "ary_digital",
+        "name": "ARY Digital",
+        "logo": "https://jazztv.com.pk/images/channels/ary-digital.webp",
+        "stream_url": "https://jfrsary.cdn.jfrstvdemo.com/arydigital/jfrstv_ary_digital_720p/playlist.m3u8",
+        "category": "Entertainment",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "geo_entertainment",
+        "name": "Geo Entertainment",
+        "logo": "https://jazztv.com.pk/images/channels/geo-entertainment.webp",
+        "stream_url": "https://jfrsgeo.cdn.jfrstvdemo.com/geoent/jfrstv_geo_ent_720p/playlist.m3u8",
+        "category": "Entertainment",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "express_ent",
+        "name": "Express Entertainment",
+        "logo": "https://jazztv.com.pk/images/channels/express-ent.webp",
+        "stream_url": "https://jfrsexp.cdn.jfrstvdemo.com/expressent/jfrstv_express_ent_720p/playlist.m3u8",
+        "category": "Entertainment",
+        "provider": "JazzTV",
+        "active": True
+    },
+    # Sports
+    {
+        "id": "ptv_sports",
+        "name": "PTV Sports",
+        "logo": "https://jazztv.com.pk/images/channels/ptv-sports.webp",
+        "stream_url": "https://jfrsptv.cdn.jfrstvdemo.com/ptvsports/jfrstv_ptv_sports_720p/playlist.m3u8",
+        "category": "Sports",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "ten_sports",
+        "name": "Ten Sports",
+        "logo": "https://jazztv.com.pk/images/channels/ten-sports.webp",
+        "stream_url": "https://jfrsten.cdn.jfrstvdemo.com/tensports/jfrstv_ten_sports_720p/playlist.m3u8",
+        "category": "Sports",
+        "provider": "JazzTV",
+        "active": True
+    },
+    # Religious
+    {
+        "id": "madani_channel",
+        "name": "Madani Channel",
+        "logo": "https://jazztv.com.pk/images/channels/madani.webp",
+        "stream_url": "https://jfrsmadani.cdn.jfrstvdemo.com/madani/jfrstv_madani_720p/playlist.m3u8",
+        "category": "Religious",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "qtv",
+        "name": "QTV",
+        "logo": "https://jazztv.com.pk/images/channels/qtv.webp",
+        "stream_url": "https://jfrsqtv.cdn.jfrstvdemo.com/qtv/jfrstv_qtv_720p/playlist.m3u8",
+        "category": "Religious",
+        "provider": "JazzTV",
+        "active": True
+    },
+    # Kids
+    {
+        "id": "cartoon_network",
+        "name": "Cartoon Network",
+        "logo": "https://jazztv.com.pk/images/channels/cartoon-network.webp",
+        "stream_url": "https://jfrscn.cdn.jfrstvdemo.com/cn/jfrstv_cn_720p/playlist.m3u8",
+        "category": "Kids",
+        "provider": "JazzTV",
+        "active": True
+    },
+    {
+        "id": "nick",
+        "name": "Nickelodeon",
+        "logo": "https://jazztv.com.pk/images/channels/nick.webp",
+        "stream_url": "https://jfrsnick.cdn.jfrstvdemo.com/nick/jfrstv_nick_720p/playlist.m3u8",
+        "category": "Kids",
+        "provider": "JazzTV",
+        "active": True
+    },
+]
+
 @api_router.get("/tools/live-tv/channels")
 async def get_tv_channels(user: dict = Depends(get_current_user)):
-    # Sample TV channels with HLS streams
-    channels = [
-        {"id": "geo_news", "name": "Geo News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/5/5e/Geo_News_2019.svg/200px-Geo_News_2019.svg.png"},
-        {"id": "ary_news", "name": "ARY News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/ARY_News_logo.svg/200px-ARY_News_logo.svg.png"},
-        {"id": "samaa_tv", "name": "Samaa TV", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/c/ce/Samaa_TV_Logo.svg/200px-Samaa_TV_Logo.svg.png"},
-        {"id": "hum_tv", "name": "Hum TV", "category": "Entertainment", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/Hum_TV_Logo.svg/200px-Hum_TV_Logo.svg.png"},
-        {"id": "express_news", "name": "Express News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/c/c2/Express_News_logo.svg/200px-Express_News_logo.svg.png"},
-        {"id": "bol_news", "name": "BOL News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/9/9d/BOL_News_Logo.svg/200px-BOL_News_Logo.svg.png"},
-    ]
-    return {"channels": channels}
+    """Return all Jazz TV / Tamasha channels"""
+    return {"channels": JAZZTV_CHANNELS, "total": len(JAZZTV_CHANNELS)}
+
+@api_router.get("/tools/live-tv/channels/{category}")
+async def get_tv_channels_by_category(category: str, user: dict = Depends(get_current_user)):
+    """Return channels filtered by category"""
+    filtered = [ch for ch in JAZZTV_CHANNELS if ch["category"].lower() == category.lower()]
+    return {"channels": filtered, "total": len(filtered), "category": category}
 
 @api_router.get("/tools/live-tv/stream/{channel_id}")
 async def get_tv_stream(channel_id: str, user: dict = Depends(get_current_user)):
     cost = await check_credits(user, "live_tv")
     
-    # Sample HLS streams (these are public test streams)
-    streams = {
-        "geo_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        "ary_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        "samaa_tv": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        "hum_tv": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        "express_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        "bol_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-    }
+    # Find channel by ID
+    channel = next((ch for ch in JAZZTV_CHANNELS if ch["id"] == channel_id), None)
     
-    stream_url = streams.get(channel_id)
-    if not stream_url:
+    if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
     
+    if not channel.get("active", True):
+        raise HTTPException(status_code=503, detail="Channel temporarily unavailable")
+    
     await deduct_credits(user["id"], "live_tv", cost, "success", channel_id)
-    return {"stream_url": stream_url, "credits_used": cost}
+    
+    return {
+        "channel_id": channel_id,
+        "channel_name": channel["name"],
+        "stream_url": channel["stream_url"],
+        "category": channel["category"],
+        "credits_used": cost
+    }
 
 @api_router.post("/tools/tamasha-otp")
 async def tamasha_otp(data: TamashaOTPRequest, user: dict = Depends(get_current_user)):
