@@ -365,9 +365,7 @@ const LiveTV = () => {
                             alt={channel.name}
                             className="w-full h-full object-contain p-1"
                             onError={(e) => { 
-                              e.target.onerror = null;
-                              e.target.src = ''; 
-                              e.target.parentElement.innerHTML = '<span class="text-xs">TV</span>';
+                              e.target.style.display = 'none';
                             }}
                           />
                         </div>
