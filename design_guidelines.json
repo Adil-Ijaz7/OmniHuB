@@ -1,0 +1,122 @@
+{
+  "identity": {
+    "name": "OmniHub",
+    "persona": "The Digital Command Center",
+    "mission": "To provide a centralized, high-efficiency toolkit for digital power users, wrapped in a sleek, futuristic interface.",
+    "tone": "Functional, Powerful, Cyber-Tech, Efficient, 'Black Mirror' but usable.",
+    "aesthetic": "Dark Mode First, Electric Accents, Glassmorphism, High Contrast."
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Chivo, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "weights": {
+      "heading": "900",
+      "body": "400",
+      "bold": "700"
+    },
+    "sizes": {
+      "h1": "text-5xl md:text-7xl tracking-tighter",
+      "h2": "text-3xl md:text-5xl tracking-tight",
+      "h3": "text-2xl md:text-3xl tracking-tight",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm tracking-wide uppercase"
+    }
+  },
+  "colors": {
+    "theme": "dark",
+    "palette": {
+      "background": "#09090b",
+      "foreground": "#fafafa",
+      "card": "#18181b",
+      "card_foreground": "#fafafa",
+      "popover": "#09090b",
+      "popover_foreground": "#fafafa",
+      "primary": "#6366f1",
+      "primary_foreground": "#fafafa",
+      "secondary": "#10b981",
+      "secondary_foreground": "#09090b",
+      "muted": "#27272a",
+      "muted_foreground": "#a1a1aa",
+      "accent": "#f43f5e",
+      "accent_foreground": "#fafafa",
+      "destructive": "#ef4444",
+      "destructive_foreground": "#fafafa",
+      "border": "#27272a",
+      "input": "#27272a",
+      "ring": "#6366f1"
+    },
+    "gradients": {
+      "primary": "bg-gradient-to-r from-indigo-500 to-purple-600",
+      "secondary": "bg-gradient-to-r from-emerald-500 to-teal-600",
+      "glass": "bg-black/40 backdrop-blur-xl border border-white/10"
+    }
+  },
+  "layout": {
+    "grid_systems": {
+      "marketing": {
+        "name": "Tetris Grid",
+        "classes": "grid grid-cols-1 md:grid-cols-12 gap-8",
+        "rules": "Asymmetry is key. Use col-span-8 for hero, col-span-4 for supporting content."
+      },
+      "dashboard": {
+        "name": "Control Room Grid",
+        "classes": "grid grid-cols-1 md:grid-cols-4 gap-6",
+        "rules": "Dense packing. Use col-span-2 row-span-2 for main charts. No jagged bottoms."
+      }
+    },
+    "spacing": {
+      "container_padding": "p-6 md:p-12",
+      "section_gap": "gap-12 md:gap-24"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_rgba(99,102,241,0.5)] transition-all duration-300 rounded-md px-8 py-3 font-bold tracking-wide",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded-md px-6 py-2 font-medium",
+      "ghost": "hover:bg-white/10 text-foreground rounded-md px-4 py-2"
+    },
+    "cards": {
+      "default": "bg-card border border-border/50 rounded-xl shadow-xl overflow-hidden hover:border-primary/50 transition-colors duration-300",
+      "glass": "bg-black/40 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl",
+      "interactive": "group relative overflow-hidden border border-white/10 bg-zinc-900/50 hover:bg-zinc-900/80 transition-all duration-500"
+    },
+    "inputs": {
+      "default": "bg-zinc-900/50 border-white/10 focus:border-primary focus:ring-1 focus:ring-primary rounded-md h-12 px-4 text-foreground placeholder:text-muted-foreground"
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_background": "https://images.unsplash.com/photo-1762690717744-5fcbd4afc95a?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "abstract_tech": "https://images.unsplash.com/photo-1762279388957-c6ed514d3353?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "live_tv": "https://images.unsplash.com/photo-1717548384641-2bc48d1ad0e5?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "security": "https://images.unsplash.com/photo-1614064642261-3ccbfafa481b?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "video_creator": "https://images.unsplash.com/photo-1673767297209-35b4a5dc3ec9?crop=entropy&cs=srgb&fm=jpg&q=85"
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "stroke-1.5"
+    }
+  },
+  "motion": {
+    "transitions": "transition-all duration-300 ease-out",
+    "hover": "hover:-translate-y-1 hover:shadow-lg",
+    "animation_classes": {
+      "fade_in": "animate-in fade-in duration-500",
+      "slide_up": "animate-in slide-in-from-bottom-4 duration-500"
+    }
+  },
+  "universal_guidelines": [
+    "Dark Mode Default: The app should feel like a hacker's terminal met a luxury car dashboard.",
+    "No Gradients on Text: Keep text crisp white or light grey. Use gradients on borders or backgrounds only.",
+    "Data-TestID: All interactive elements must have data-testid attributes.",
+    "Spacing: Use generous padding (p-8+) inside containers to avoid cramped text.",
+    "Borders: Use 1px borders with low opacity (border-white/10) to define structure without clutter.",
+    "Shadows: Use colored shadows (shadow-indigo-500/20) to create a 'glow' effect.",
+    "Typography: Headings must be bold and tight (tracking-tighter). Body text must be readable and relaxed.",
+    "Credit System: Visualize credits prominently. Use a digital counter style."
+  ],
+  "instructions_to_main_agent": "1. Install 'lucide-react' and 'framer-motion'. 2. Update 'tailwind.config.js' with the colors provided. 3. Create a 'Layout' component that handles the sidebar/header structure. 4. Build the 'Dashboard' using the 'Control Room Grid'. 5. Use the provided image URLs for the respective sections."
+}
