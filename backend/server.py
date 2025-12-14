@@ -780,7 +780,7 @@ JAZZTV_CHANNELS = [
         "id": "test_stream",
         "name": "Test Channel (Big Buck Bunny)",
         "logo": "https://i.imgur.com/qPD9J4I.png",
-        "stream_url": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "stream_url": "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
         "category": "Test",
         "provider": "Test",
         "active": True
