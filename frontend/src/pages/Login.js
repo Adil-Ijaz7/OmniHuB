@@ -124,12 +124,6 @@ const Login = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 rounded-lg glass text-center">
-          <p className="text-xs text-muted-foreground mb-2">Demo Admin Login</p>
-          <p className="text-sm font-mono text-foreground">admin@omnihub.com / Admin@123</p>
-        </div>
       </div>
     </div>
   );
