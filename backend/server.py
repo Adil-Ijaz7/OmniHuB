@@ -715,9 +715,10 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Startup event - Create admin user
+# Startup event - Create admin users
 @app.on_event("startup")
 async def startup_event():
+    # Main Super Admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@omnihub.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@123")
     
@@ -726,7 +727,7 @@ async def startup_event():
         admin_user = {
             "id": str(uuid.uuid4()),
             "email": admin_email,
-            "name": "Admin",
+            "name": "Super Admin",
             "password_hash": get_password_hash(admin_password),
             "role": "admin",
             "credits": 999999,
@@ -734,7 +735,32 @@ async def startup_event():
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.users.insert_one(admin_user)
-        logger.info(f"Admin user created: {admin_email}")
+        logger.info(f"Super Admin created: {admin_email}")
+    
+    # Additional Admin accounts with 100 credits each
+    additional_admins = [
+        {"email": "admin1@omnihub.com", "password": "Admin1@123", "name": "Admin One"},
+        {"email": "admin2@omnihub.com", "password": "Admin2@123", "name": "Admin Two"},
+        {"email": "admin3@omnihub.com", "password": "Admin3@123", "name": "Admin Three"},
+        {"email": "admin4@omnihub.com", "password": "Admin4@123", "name": "Admin Four"},
+        {"email": "admin5@omnihub.com", "password": "Admin5@123", "name": "Admin Five"},
+    ]
+    
+    for admin_data in additional_admins:
+        existing = await db.users.find_one({"email": admin_data["email"]})
+        if not existing:
+            new_admin = {
+                "id": str(uuid.uuid4()),
+                "email": admin_data["email"],
+                "name": admin_data["name"],
+                "password_hash": get_password_hash(admin_data["password"]),
+                "role": "admin",
+                "credits": 100,
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.users.insert_one(new_admin)
+            logger.info(f"Admin created: {admin_data['email']} with 100 credits")
     
     # Create indexes
     await db.users.create_index("email", unique=True)
