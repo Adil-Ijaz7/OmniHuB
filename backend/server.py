@@ -1,15 +1,18 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
-
+from datetime import datetime, timezone, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,56 +22,525 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+# JWT Configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', 'omnihub_secret_key')
+JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('ACCESS_TOKEN_EXPIRE_MINUTES', 1440))
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Security
+security = HTTPBearer()
+
+# Create the main app
+app = FastAPI(title="OmniHub API")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# ============== MODELS ==============
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+class UserBase(BaseModel):
+    email: EmailStr
+    name: str
+
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    credits: int
+    is_active: bool
+    created_at: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+class CreditUpdate(BaseModel):
+    user_id: str
+    amount: int
+    reason: str
+
+class UsageLogResponse(BaseModel):
+    id: str
+    user_id: str
+    user_email: str
+    tool: str
+    credits_used: int
+    status: str
+    details: Optional[str] = None
+    created_at: str
+
+class CreditLogResponse(BaseModel):
+    id: str
+    user_id: str
+    user_email: str
+    amount: int
+    balance_after: int
+    reason: str
+    admin_id: str
+    created_at: str
+
+# Tool request models
+class PhoneLookupRequest(BaseModel):
+    phone: str
+
+class EyeconLookupRequest(BaseModel):
+    phone: str
+
+class TempEmailRequest(BaseModel):
+    action: str = "generate"
+    email: Optional[str] = None
+
+class YouTubeRequest(BaseModel):
+    url: str
+
+class ImageEnhanceRequest(BaseModel):
+    image_url: str
+
+class TamashaOTPRequest(BaseModel):
+    phone: str
+    action: str = "send"
+    otp: Optional[str] = None
+
+# Credit costs
+CREDIT_COSTS = {
+    "live_tv": 1,
+    "tamasha_otp": 2,
+    "temp_email": 1,
+    "youtube_download": 3,
+    "image_enhance": 2,
+    "phone_lookup": 1,
+    "eyecon_lookup": 1
+}
+
+# ============== HELPERS ==============
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        if not user.get("is_active", True):
+            raise HTTPException(status_code=403, detail="User suspended")
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def require_admin(user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+async def check_credits(user: dict, tool: str):
+    cost = CREDIT_COSTS.get(tool, 1)
+    if user.get("credits", 0) < cost:
+        raise HTTPException(status_code=402, detail=f"Insufficient credits. Required: {cost}, Available: {user.get('credits', 0)}")
+    return cost
+
+async def deduct_credits(user_id: str, tool: str, cost: int, status_str: str = "success", details: str = None):
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    new_balance = user.get("credits", 0) - cost
+    await db.users.update_one({"id": user_id}, {"$set": {"credits": new_balance}})
     
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Log usage
+    usage_log = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "user_email": user.get("email"),
+        "tool": tool,
+        "credits_used": cost,
+        "status": status_str,
+        "details": details,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.usage_logs.insert_one(usage_log)
+    return new_balance
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+# ============== AUTH ROUTES ==============
 
-# Add your routes to the router instead of directly to app
+@api_router.post("/auth/register", response_model=TokenResponse)
+async def register(user_data: UserCreate):
+    existing = await db.users.find_one({"email": user_data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    user_id = str(uuid.uuid4())
+    user = {
+        "id": user_id,
+        "email": user_data.email,
+        "name": user_data.name,
+        "password_hash": get_password_hash(user_data.password),
+        "role": "user",
+        "credits": 0,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user)
+    
+    access_token = create_access_token(data={"sub": user_id, "role": "user"})
+    return TokenResponse(
+        access_token=access_token,
+        user=UserResponse(
+            id=user_id,
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            credits=user["credits"],
+            is_active=user["is_active"],
+            created_at=user["created_at"]
+        )
+    )
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(login_data: UserLogin):
+    user = await db.users.find_one({"email": login_data.email}, {"_id": 0})
+    if not user or not verify_password(login_data.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="Account suspended")
+    
+    access_token = create_access_token(data={"sub": user["id"], "role": user["role"]})
+    return TokenResponse(
+        access_token=access_token,
+        user=UserResponse(
+            id=user["id"],
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            credits=user["credits"],
+            is_active=user["is_active"],
+            created_at=user["created_at"]
+        )
+    )
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(user: dict = Depends(get_current_user)):
+    return UserResponse(
+        id=user["id"],
+        email=user["email"],
+        name=user["name"],
+        role=user["role"],
+        credits=user["credits"],
+        is_active=user["is_active"],
+        created_at=user["created_at"]
+    )
+
+# ============== ADMIN ROUTES ==============
+
+@api_router.get("/admin/users", response_model=List[UserResponse])
+async def get_all_users(admin: dict = Depends(require_admin)):
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
+    return [UserResponse(**u) for u in users]
+
+@api_router.post("/admin/credits")
+async def update_credits(data: CreditUpdate, admin: dict = Depends(require_admin)):
+    user = await db.users.find_one({"id": data.user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_balance = user.get("credits", 0) + data.amount
+    if new_balance < 0:
+        raise HTTPException(status_code=400, detail="Cannot reduce credits below 0")
+    
+    await db.users.update_one({"id": data.user_id}, {"$set": {"credits": new_balance}})
+    
+    # Log credit change
+    credit_log = {
+        "id": str(uuid.uuid4()),
+        "user_id": data.user_id,
+        "user_email": user.get("email"),
+        "amount": data.amount,
+        "balance_after": new_balance,
+        "reason": data.reason,
+        "admin_id": admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.credit_logs.insert_one(credit_log)
+    
+    return {"message": "Credits updated", "new_balance": new_balance}
+
+@api_router.post("/admin/users/{user_id}/suspend")
+async def suspend_user(user_id: str, admin: dict = Depends(require_admin)):
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="Cannot suspend admin")
+    
+    new_status = not user.get("is_active", True)
+    await db.users.update_one({"id": user_id}, {"$set": {"is_active": new_status}})
+    return {"message": f"User {'unsuspended' if new_status else 'suspended'}", "is_active": new_status}
+
+@api_router.get("/admin/usage-logs", response_model=List[UsageLogResponse])
+async def get_usage_logs(admin: dict = Depends(require_admin), limit: int = Query(100, le=1000)):
+    logs = await db.usage_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    return logs
+
+@api_router.get("/admin/credit-logs", response_model=List[CreditLogResponse])
+async def get_credit_logs(admin: dict = Depends(require_admin), limit: int = Query(100, le=1000)):
+    logs = await db.credit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    return logs
+
+# ============== TOOL ROUTES ==============
+
+@api_router.post("/tools/phone-lookup")
+async def phone_lookup(data: PhoneLookupRequest, user: dict = Depends(get_current_user)):
+    cost = await check_credits(user, "phone_lookup")
+    
+    try:
+        async with httpx.AsyncClient() as client_http:
+            response = await client_http.get(
+                f"https://sychosimdatabase.vercel.app/api/lookup?query={data.phone}",
+                timeout=30.0
+            )
+            result = response.json()
+        
+        await deduct_credits(user["id"], "phone_lookup", cost, "success", data.phone)
+        return {"success": True, "data": result, "credits_used": cost}
+    except Exception as e:
+        await deduct_credits(user["id"], "phone_lookup", cost, "failed", str(e))
+        raise HTTPException(status_code=500, detail=f"Lookup failed: {str(e)}")
+
+@api_router.post("/tools/eyecon-lookup")
+async def eyecon_lookup(data: EyeconLookupRequest, user: dict = Depends(get_current_user)):
+    cost = await check_credits(user, "eyecon_lookup")
+    
+    # Get Eyecon credentials from env
+    e_auth_v = os.environ.get("EYECON_E_AUTH_V", "REPLACE_ME")
+    e_auth = os.environ.get("EYECON_E_AUTH", "REPLACE_ME")
+    e_auth_c = os.environ.get("EYECON_E_AUTH_C", "REPLACE_ME")
+    e_auth_k = os.environ.get("EYECON_E_AUTH_K", "REPLACE_ME")
+    
+    if "REPLACE_ME" in [e_auth_v, e_auth, e_auth_c, e_auth_k]:
+        raise HTTPException(status_code=503, detail="Eyecon API not configured. Please contact admin.")
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "accept": "application/json",
+        "e-auth-v": e_auth_v,
+        "e-auth": e_auth,
+        "e-auth-c": e_auth_c,
+        "e-auth-k": e_auth_k,
+        "accept-charset": "UTF-8",
+        "content-type": "application/x-www-form-urlencoded",
+        "Host": "api.eyecon-app.com",
+        "Connection": "Keep-Alive"
+    }
+    
+    params = {
+        "cli": data.phone,
+        "lang": "en",
+        "is_callerid": "true",
+        "is_ic": "true",
+        "cv": "vc_672_vn_4.2025.10.17.1932_a",
+        "requestApi": "URLconnection",
+        "source": "MenifaFragment"
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client_http:
+            response = await client_http.get(
+                "https://api.eyecon-app.com/app/getnames.jsp",
+                headers=headers,
+                params=params,
+                timeout=30.0
+            )
+            result = response.json()
+        
+        await deduct_credits(user["id"], "eyecon_lookup", cost, "success", data.phone)
+        return {"success": True, "data": result, "credits_used": cost}
+    except Exception as e:
+        await deduct_credits(user["id"], "eyecon_lookup", cost, "failed", str(e))
+        raise HTTPException(status_code=500, detail=f"Eyecon lookup failed: {str(e)}")
+
+@api_router.post("/tools/temp-email")
+async def temp_email(data: TempEmailRequest, user: dict = Depends(get_current_user)):
+    cost = await check_credits(user, "temp_email")
+    
+    try:
+        async with httpx.AsyncClient() as client_http:
+            if data.action == "generate":
+                # Generate new temp email
+                response = await client_http.get(
+                    "https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1",
+                    timeout=30.0
+                )
+                emails = response.json()
+                await deduct_credits(user["id"], "temp_email", cost, "success", "generated")
+                return {"success": True, "email": emails[0] if emails else None, "credits_used": cost}
+            elif data.action == "check" and data.email:
+                # Check inbox
+                login, domain = data.email.split("@")
+                response = await client_http.get(
+                    f"https://www.1secmail.com/api/v1/?action=getMessages&login={login}&domain={domain}",
+                    timeout=30.0
+                )
+                messages = response.json()
+                return {"success": True, "messages": messages, "credits_used": 0}  # Checking is free
+            else:
+                raise HTTPException(status_code=400, detail="Invalid action")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Temp email error: {str(e)}")
+
+@api_router.post("/tools/youtube-download")
+async def youtube_download(data: YouTubeRequest, user: dict = Depends(get_current_user)):
+    cost = await check_credits(user, "youtube_download")
+    
+    try:
+        # Using a free YouTube info API
+        video_id = None
+        if "youtube.com" in data.url:
+            video_id = data.url.split("v=")[1].split("&")[0] if "v=" in data.url else None
+        elif "youtu.be" in data.url:
+            video_id = data.url.split("/")[-1].split("?")[0]
+        
+        if not video_id:
+            raise HTTPException(status_code=400, detail="Invalid YouTube URL")
+        
+        # Get video info using noembed
+        async with httpx.AsyncClient() as client_http:
+            response = await client_http.get(
+                f"https://noembed.com/embed?url=https://www.youtube.com/watch?v={video_id}",
+                timeout=30.0
+            )
+            video_info = response.json()
+        
+        await deduct_credits(user["id"], "youtube_download", cost, "success", video_id)
+        
+        return {
+            "success": True,
+            "video_id": video_id,
+            "title": video_info.get("title", "Unknown"),
+            "author": video_info.get("author_name", "Unknown"),
+            "thumbnail": video_info.get("thumbnail_url", f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"),
+            "download_links": [
+                {"quality": "720p", "url": f"https://ssyoutube.com/watch?v={video_id}"},
+                {"quality": "360p", "url": f"https://ssyoutube.com/watch?v={video_id}"}
+            ],
+            "credits_used": cost
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"YouTube download error: {str(e)}")
+
+@api_router.post("/tools/image-enhance")
+async def image_enhance(data: ImageEnhanceRequest, user: dict = Depends(get_current_user)):
+    cost = await check_credits(user, "image_enhance")
+    
+    try:
+        # Using free image upscaling API placeholder
+        # In production, integrate with real image enhancement service
+        await deduct_credits(user["id"], "image_enhance", cost, "success", data.image_url)
+        
+        return {
+            "success": True,
+            "original_url": data.image_url,
+            "enhanced_url": data.image_url,  # Placeholder - integrate real service
+            "message": "Image enhancement service ready. Configure external API for full functionality.",
+            "credits_used": cost
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image enhance error: {str(e)}")
+
+@api_router.get("/tools/live-tv/channels")
+async def get_tv_channels(user: dict = Depends(get_current_user)):
+    # Sample TV channels with HLS streams
+    channels = [
+        {"id": "geo_news", "name": "Geo News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/5/5e/Geo_News_2019.svg/200px-Geo_News_2019.svg.png"},
+        {"id": "ary_news", "name": "ARY News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/ARY_News_logo.svg/200px-ARY_News_logo.svg.png"},
+        {"id": "samaa_tv", "name": "Samaa TV", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/c/ce/Samaa_TV_Logo.svg/200px-Samaa_TV_Logo.svg.png"},
+        {"id": "hum_tv", "name": "Hum TV", "category": "Entertainment", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/Hum_TV_Logo.svg/200px-Hum_TV_Logo.svg.png"},
+        {"id": "express_news", "name": "Express News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/c/c2/Express_News_logo.svg/200px-Express_News_logo.svg.png"},
+        {"id": "bol_news", "name": "BOL News", "category": "News", "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/9/9d/BOL_News_Logo.svg/200px-BOL_News_Logo.svg.png"},
+    ]
+    return {"channels": channels}
+
+@api_router.get("/tools/live-tv/stream/{channel_id}")
+async def get_tv_stream(channel_id: str, user: dict = Depends(get_current_user)):
+    cost = await check_credits(user, "live_tv")
+    
+    # Sample HLS streams (these are public test streams)
+    streams = {
+        "geo_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "ary_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "samaa_tv": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "hum_tv": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "express_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+        "bol_news": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    }
+    
+    stream_url = streams.get(channel_id)
+    if not stream_url:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    await deduct_credits(user["id"], "live_tv", cost, "success", channel_id)
+    return {"stream_url": stream_url, "credits_used": cost}
+
+@api_router.post("/tools/tamasha-otp")
+async def tamasha_otp(data: TamashaOTPRequest, user: dict = Depends(get_current_user)):
+    cost = await check_credits(user, "tamasha_otp")
+    
+    try:
+        if data.action == "send":
+            # Placeholder for Tamasha OTP send
+            await deduct_credits(user["id"], "tamasha_otp", cost, "success", f"send:{data.phone}")
+            return {
+                "success": True,
+                "message": "OTP sent successfully (simulated). Configure Tamasha API for full functionality.",
+                "credits_used": cost
+            }
+        elif data.action == "verify" and data.otp:
+            # Placeholder for OTP verification
+            return {
+                "success": True,
+                "message": "OTP verified (simulated). Configure Tamasha API for full functionality.",
+                "credits_used": 0  # Verification is free
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Tamasha OTP error: {str(e)}")
+
+@api_router.get("/user/usage-history", response_model=List[UsageLogResponse])
+async def get_user_usage_history(user: dict = Depends(get_current_user), limit: int = Query(50, le=200)):
+    logs = await db.usage_logs.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    return logs
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "OmniHub API", "version": "1.0.0"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
-
-# Include the router in the main app
+# Include the router
 app.include_router(api_router)
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -77,12 +549,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Startup event - Create admin user
+@app.on_event("startup")
+async def startup_event():
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@omnihub.com")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@123")
+    
+    existing_admin = await db.users.find_one({"email": admin_email})
+    if not existing_admin:
+        admin_user = {
+            "id": str(uuid.uuid4()),
+            "email": admin_email,
+            "name": "Admin",
+            "password_hash": get_password_hash(admin_password),
+            "role": "admin",
+            "credits": 999999,
+            "is_active": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.insert_one(admin_user)
+        logger.info(f"Admin user created: {admin_email}")
+    
+    # Create indexes
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("id", unique=True)
+    await db.usage_logs.create_index("user_id")
+    await db.usage_logs.create_index("created_at")
+    await db.credit_logs.create_index("user_id")
+    await db.credit_logs.create_index("created_at")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
