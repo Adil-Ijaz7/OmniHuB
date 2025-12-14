@@ -631,68 +631,14 @@ async def image_enhance(data: ImageEnhanceRequest, user: dict = Depends(get_curr
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Image enhance error: {str(e)}")
 
-# Jazz TV / Tamasha Channel Data - Working Streams from iptv-org
+# Jazz TV / Tamasha Channel Data - Verified Working Streams
 JAZZTV_CHANNELS = [
-    # News Channels
-    {
-        "id": "geo_news",
-        "name": "Geo News",
-        "logo": "https://i.imgur.com/Op4EsaB.png",
-        "stream_url": "https://jk3lz82elw79-hls-live.5centscdn.com/GEONEWS/3500ba09d0538297440ca620c9dd46bf.sdp/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
+    # News Channels (Verified Working)
     {
         "id": "92_news",
         "name": "92 News HD",
         "logo": "https://i.imgur.com/gp1Ao4s.jpeg",
         "stream_url": "http://92news.vdn.dstreamone.net/92newshd/92hd/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "geo_tez",
-        "name": "Geo Tez",
-        "logo": "https://geotez.tv/assets/front/images/tez_logo.png",
-        "stream_url": "https://jk3lz82elw79-hls-live.5centscdn.com/newgeonews/07811dc6c422334ce36a09ff5cd6fe71.sdp/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "dunya_news",
-        "name": "Dunya News",
-        "logo": "https://i.postimg.cc/htHtP9VP/dunyanews.png",
-        "stream_url": "https://imob.dunyanews.tv/livehd/ngrp:dunyalivehd_2_all/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "khyber_news",
-        "name": "Khyber News",
-        "logo": "https://i.imgur.com/7SyLba4.png",
-        "stream_url": "https://trn03.tulix.tv/gf-khybernews/index.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "lahore_news",
-        "name": "Lahore News",
-        "logo": "https://i.imgur.com/bQfQeEA.jpeg",
-        "stream_url": "https://vcdn.dunyanews.tv/lahorelive/ngrp:lnews_1_all/playlist.m3u8",
-        "category": "News",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "city_news",
-        "name": "City News HD",
-        "logo": "https://i.imgur.com/GtYG9lG.png",
-        "stream_url": "http://cdn.citymediagroupreg.com:1935/citynewshd/myStream/playlist.m3u8",
         "category": "News",
         "provider": "Tamasha",
         "active": True
@@ -707,10 +653,10 @@ JAZZTV_CHANNELS = [
         "active": True
     },
     {
-        "id": "aik_news",
-        "name": "Aik News",
-        "logo": "https://i.imgur.com/svPXoAP.png",
-        "stream_url": "https://video.primexsports.com/pnn/live/playlist.m3u8",
+        "id": "city_news",
+        "name": "City News HD",
+        "logo": "https://i.imgur.com/GtYG9lG.png",
+        "stream_url": "http://cdn.citymediagroupreg.com:1935/citynewshd/myStream/playlist.m3u8",
         "category": "News",
         "provider": "Tamasha",
         "active": True
@@ -724,53 +670,7 @@ JAZZTV_CHANNELS = [
         "provider": "Tamasha",
         "active": True
     },
-    # Entertainment Channels
-    {
-        "id": "geo_kahani",
-        "name": "Geo Kahani",
-        "logo": "https://i.postimg.cc/7ZmSsPJy/geokahani.png",
-        "stream_url": "https://jk3lz82elw79-hls-live.5centscdn.com/harPalGeo/955ad3298db330b5ee880c2c9e6f23a0.sdp/playlist.m3u8",
-        "category": "Entertainment",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "express_ent",
-        "name": "Express Entertainment",
-        "logo": "https://i.imgur.com/rgHbb8W.png",
-        "stream_url": "https://5dcabf026b188.streamlock.net/expressdigital/livestream/playlist.m3u8",
-        "category": "Entertainment",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "avt_khyber",
-        "name": "AVT Khyber",
-        "logo": "https://i.imgur.com/FqkABWT.png",
-        "stream_url": "https://trn03.tulix.tv/gf-khybertv/index.m3u8",
-        "category": "Entertainment",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "aur_life",
-        "name": "aurLife HD",
-        "logo": "https://i.imgur.com/GfWLn3O.jpg",
-        "stream_url": "http://124.109.47.101/hls/stream1.m3u8",
-        "category": "Entertainment",
-        "provider": "Tamasha",
-        "active": True
-    },
-    # Sports
-    {
-        "id": "geo_super",
-        "name": "Geo Super",
-        "logo": "https://upload.wikimedia.org/wikipedia/en/5/5f/Geo_Super_logo.png",
-        "stream_url": "http://116.90.120.149:8000/play/a021/index.m3u8",
-        "category": "Sports",
-        "provider": "Tamasha",
-        "active": True
-    },
+    # Sports (Verified Working)
     {
         "id": "ptv_sports",
         "name": "PTV Sports",
@@ -781,15 +681,15 @@ JAZZTV_CHANNELS = [
         "active": True
     },
     {
-        "id": "one_golf",
-        "name": "One Golf",
-        "logo": "https://i.imgur.com/7JhaEW5.png",
-        "stream_url": "http://162.250.201.58:6211/pk/ONEGOLF/index.m3u8",
+        "id": "geo_super",
+        "name": "Geo Super",
+        "logo": "https://upload.wikimedia.org/wikipedia/en/5/5f/Geo_Super_logo.png",
+        "stream_url": "http://116.90.120.149:8000/play/a021/index.m3u8",
         "category": "Sports",
         "provider": "Tamasha",
         "active": True
     },
-    # Religious
+    # Religious (Verified Working)
     {
         "id": "madani_urdu",
         "name": "Madani Channel Urdu",
@@ -809,28 +709,10 @@ JAZZTV_CHANNELS = [
         "active": True
     },
     {
-        "id": "peace_tv_urdu",
-        "name": "Peace TV Urdu",
-        "logo": "https://i.postimg.cc/cLCfzgqB/peacetvurdu.png",
-        "stream_url": "https://dzkyvlfyge.erbvr.com/PeaceTvUrdu/index.m3u8",
-        "category": "Religious",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
         "id": "abn_urdu",
         "name": "ABN Urdu",
         "logo": "https://i.imgur.com/Y9ScPIl.png",
         "stream_url": "https://mediaserver.abnvideos.com/streams/abnurdu.m3u8",
-        "category": "Religious",
-        "provider": "Tamasha",
-        "active": True
-    },
-    {
-        "id": "hk_tv",
-        "name": "HK TV",
-        "logo": "https://i.imgur.com/brAY4XF.png",
-        "stream_url": "https://streamer12.vdn.dstreamone.net/hktv/hktv/playlist.m3u8",
         "category": "Religious",
         "provider": "Tamasha",
         "active": True
@@ -853,26 +735,25 @@ JAZZTV_CHANNELS = [
         "provider": "Tamasha",
         "active": True
     },
-    # Kids
     {
-        "id": "minimax",
-        "name": "Minimax",
-        "logo": "https://i.imgur.com/TJvf8vd.png",
-        "stream_url": "http://116.90.120.149:8000/play/a01c/index.m3u8",
-        "category": "Kids",
+        "id": "gawahi_tv",
+        "name": "Gawahi TV",
+        "logo": "https://i.imgur.com/0W6zzHS.png",
+        "stream_url": "https://livecdn.live247stream.com/gawahi/tv/playlist.m3u8",
+        "category": "Religious",
         "provider": "Tamasha",
         "active": True
     },
-    # Music
     {
-        "id": "8xm",
-        "name": "8XM Music",
-        "logo": "https://i.imgur.com/KLrfKRn.png",
-        "stream_url": "http://87.255.35.150:18883",
-        "category": "Music",
+        "id": "joshua_tv",
+        "name": "Joshua TV",
+        "logo": "https://i.imgur.com/x9xPR2h.png",
+        "stream_url": "https://livecdn.live247stream.com/joshua/tv/playlist.m3u8",
+        "category": "Religious",
         "provider": "Tamasha",
         "active": True
     },
+    # Music (Verified Working)
     {
         "id": "joo_music",
         "name": "JooMusic",
@@ -882,13 +763,33 @@ JAZZTV_CHANNELS = [
         "provider": "Tamasha",
         "active": True
     },
-    # Travel
+    # Travel (Verified Working)
     {
         "id": "discover_pakistan",
         "name": "Discover Pakistan",
         "logo": "https://i.imgur.com/IJH47fJ.png",
         "stream_url": "https://livecdn.live247stream.com/discoverpakistan/web/playlist.m3u8",
         "category": "Travel",
+        "provider": "Tamasha",
+        "active": True
+    },
+    # Entertainment 
+    {
+        "id": "see_tv",
+        "name": "See TV",
+        "logo": "https://i.postimg.cc/T3NR0zPN/seetv.png",
+        "stream_url": "http://116.90.120.149:8000/play/a01l/index.m3u8",
+        "category": "Entertainment",
+        "provider": "Tamasha",
+        "active": True
+    },
+    # Kids
+    {
+        "id": "minimax",
+        "name": "Minimax",
+        "logo": "https://i.imgur.com/TJvf8vd.png",
+        "stream_url": "http://116.90.120.149:8000/play/a01c/index.m3u8",
+        "category": "Kids",
         "provider": "Tamasha",
         "active": True
     },
