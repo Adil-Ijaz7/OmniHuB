@@ -315,19 +315,42 @@ async def get_credit_logs(admin: dict = Depends(require_admin), limit: int = Que
 async def phone_lookup(data: PhoneLookupRequest, user: dict = Depends(get_current_user)):
     cost = await check_credits(user, "phone_lookup")
     
+    # Sanitize phone number - remove all non-numeric characters
+    import re
+    sanitized_phone = re.sub(r'\D', '', data.phone)
+    
+    # Ensure proper format (add 92 prefix if starts with 0)
+    if sanitized_phone.startswith('0'):
+        sanitized_phone = '92' + sanitized_phone[1:]
+    
     try:
         async with httpx.AsyncClient() as client_http:
             response = await client_http.get(
-                f"https://sychosimdatabase.vercel.app/api/lookup?query={data.phone}",
+                f"https://sychosimdatabase.vercel.app/api/lookup?query={sanitized_phone}",
                 timeout=30.0
             )
-            result = response.json()
+            api_response = response.json()
         
-        await deduct_credits(user["id"], "phone_lookup", cost, "success", data.phone)
-        return {"success": True, "data": result, "credits_used": cost}
+        await deduct_credits(user["id"], "phone_lookup", cost, "success", sanitized_phone)
+        
+        # Return the exact API response structure
+        return {
+            "success": api_response.get("success", False),
+            "results_count": api_response.get("results_count", 0),
+            "results": api_response.get("results", []),
+            "query": sanitized_phone,
+            "credits_used": cost
+        }
     except Exception as e:
         await deduct_credits(user["id"], "phone_lookup", cost, "failed", str(e))
-        raise HTTPException(status_code=500, detail=f"Lookup failed: {str(e)}")
+        return {
+            "success": False,
+            "results_count": 0,
+            "results": [],
+            "query": sanitized_phone,
+            "error": str(e),
+            "credits_used": cost
+        }
 
 @api_router.post("/tools/eyecon-lookup")
 async def eyecon_lookup(data: EyeconLookupRequest, user: dict = Depends(get_current_user)):
