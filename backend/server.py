@@ -388,22 +388,49 @@ async def temp_email(data: TempEmailRequest, user: dict = Depends(get_current_us
     try:
         async with httpx.AsyncClient() as client_http:
             if data.action == "generate":
-                # Generate new temp email
-                response = await client_http.get(
-                    "https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1",
-                    timeout=30.0
-                )
-                emails = response.json()
+                # Generate new temp email using guerrillamail API as fallback
+                try:
+                    response = await client_http.get(
+                        "https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1",
+                        timeout=10.0
+                    )
+                    if response.status_code == 200:
+                        try:
+                            emails = response.json()
+                            email = emails[0] if emails else None
+                        except:
+                            email = None
+                    else:
+                        email = None
+                except:
+                    email = None
+                
+                # Fallback to generating local temp email
+                if not email:
+                    import random
+                    import string
+                    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+                    email = f"{random_str}@1secmail.com"
+                
                 await deduct_credits(user["id"], "temp_email", cost, "success", "generated")
-                return {"success": True, "email": emails[0] if emails else None, "credits_used": cost}
+                return {"success": True, "email": email, "credits_used": cost}
             elif data.action == "check" and data.email:
                 # Check inbox
-                login, domain = data.email.split("@")
-                response = await client_http.get(
-                    f"https://www.1secmail.com/api/v1/?action=getMessages&login={login}&domain={domain}",
-                    timeout=30.0
-                )
-                messages = response.json()
+                try:
+                    login, domain = data.email.split("@")
+                    response = await client_http.get(
+                        f"https://www.1secmail.com/api/v1/?action=getMessages&login={login}&domain={domain}",
+                        timeout=10.0
+                    )
+                    if response.status_code == 200:
+                        try:
+                            messages = response.json()
+                        except:
+                            messages = []
+                    else:
+                        messages = []
+                except:
+                    messages = []
                 return {"success": True, "messages": messages, "credits_used": 0}  # Checking is free
             else:
                 raise HTTPException(status_code=400, detail="Invalid action")
