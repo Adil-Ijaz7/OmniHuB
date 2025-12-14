@@ -333,22 +333,24 @@ async def phone_lookup(data: PhoneLookupRequest, user: dict = Depends(get_curren
 async def eyecon_lookup(data: EyeconLookupRequest, user: dict = Depends(get_current_user)):
     cost = await check_credits(user, "eyecon_lookup")
     
-    # Get Eyecon credentials from env
-    e_auth_v = os.environ.get("EYECON_E_AUTH_V", "REPLACE_ME")
-    e_auth = os.environ.get("EYECON_E_AUTH", "REPLACE_ME")
-    e_auth_c = os.environ.get("EYECON_E_AUTH_C", "REPLACE_ME")
-    e_auth_k = os.environ.get("EYECON_E_AUTH_K", "REPLACE_ME")
+    # Get Eyecon credentials from env (use empty string as fallback - API will handle auth errors)
+    e_auth_v = os.environ.get("EYECON_E_AUTH_V", "")
+    e_auth = os.environ.get("EYECON_E_AUTH", "")
+    e_auth_c = os.environ.get("EYECON_E_AUTH_C", "")
+    e_auth_k = os.environ.get("EYECON_E_AUTH_K", "")
     
-    if "REPLACE_ME" in [e_auth_v, e_auth, e_auth_c, e_auth_k]:
-        raise HTTPException(status_code=503, detail="Eyecon API not configured. Please contact admin.")
+    # Log warning if config incomplete (but don't block)
+    config_incomplete = not all([e_auth_v, e_auth, e_auth_c, e_auth_k]) or "REPLACE_ME" in [e_auth_v, e_auth, e_auth_c, e_auth_k]
+    if config_incomplete:
+        logger.warning("Eyecon API credentials not fully configured - running in safe mode")
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
         "accept": "application/json",
-        "e-auth-v": e_auth_v,
-        "e-auth": e_auth,
-        "e-auth-c": e_auth_c,
-        "e-auth-k": e_auth_k,
+        "e-auth-v": e_auth_v if e_auth_v and e_auth_v != "REPLACE_ME" else "",
+        "e-auth": e_auth if e_auth and e_auth != "REPLACE_ME" else "",
+        "e-auth-c": e_auth_c if e_auth_c and e_auth_c != "REPLACE_ME" else "",
+        "e-auth-k": e_auth_k if e_auth_k and e_auth_k != "REPLACE_ME" else "",
         "accept-charset": "UTF-8",
         "content-type": "application/x-www-form-urlencoded",
         "Host": "api.eyecon-app.com",
@@ -373,13 +375,17 @@ async def eyecon_lookup(data: EyeconLookupRequest, user: dict = Depends(get_curr
                 params=params,
                 timeout=30.0
             )
-            result = response.json()
+            # Try to parse JSON, handle non-JSON responses gracefully
+            try:
+                result = response.json()
+            except:
+                result = {"raw_response": response.text[:500], "status_code": response.status_code}
         
         await deduct_credits(user["id"], "eyecon_lookup", cost, "success", data.phone)
-        return {"success": True, "data": result, "credits_used": cost}
+        return {"success": True, "data": result, "credits_used": cost, "safe_mode": config_incomplete}
     except Exception as e:
         await deduct_credits(user["id"], "eyecon_lookup", cost, "failed", str(e))
-        raise HTTPException(status_code=500, detail=f"Eyecon lookup failed: {str(e)}")
+        return {"success": False, "data": None, "error": str(e), "credits_used": cost, "safe_mode": config_incomplete}
 
 @api_router.post("/tools/temp-email")
 async def temp_email(data: TempEmailRequest, user: dict = Depends(get_current_user)):
