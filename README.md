@@ -28,10 +28,6 @@ OmniHub is a comprehensive multi-tool platform that provides various digital ser
 - Usage Logs (all tool usage across platform)
 - Credit Transaction Logs
 
-## Default Credentials
-- **Admin Email**: admin@omnihub.com
-- **Admin Password**: Admin@123
-
 ## API Endpoints
 
 ### Authentication
